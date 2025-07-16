@@ -12,52 +12,15 @@ class Particle {
         this.y = y;
         this.vx = 0;
         this.vy = 0;
-        this.mass = 1;
-        this.window = null;
-        this.radius = 30;
-        this.color = type === 'positive' ? '#ff6b6b' : '#4ecdc4';
+        this.radius = 18;
+        this.mass = 1; // <-- Add this line
+        this.color = type === 'positive' ? '#e74c3c' : '#3498db';
         this.symbol = type === 'positive' ? '+' : '-';
+        this.isDragging = false;
+        this.dragOffset = { x: 0, y: 0 };
     }
 
-    /**
-     * Generate HTML content for particle window
-     */
-    generateHTML() {
-        return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Magnetic Particle (${this.type})</title>
-            <link rel="stylesheet" href="/styles/particle.css">
-        </head>
-        <body>
-            <div class="info">Charge: ${this.symbol} | Drag to move</div>
-            <canvas id="canvas"></canvas>
-            <script src="/js/particleWindow.js"></script>
-            <script>
-                // Initialize particle window
-                const particleWindow = new ParticleWindow(${this.id}, '${this.type}', ${this.charge}, '${this.color}', '${this.symbol}');
-            </script>
-        </body>
-        </html>
-        `;
-    }
-
-    /**
-     * Create and open particle window
-     */
-    createWindow(x, y) {
-        const windowWidth = 300;
-        const windowHeight = 300;
-        
-        this.window = window.open(
-            'data:text/html;charset=utf-8,' + encodeURIComponent(this.generateHTML()),
-            '_blank',
-            `width=${windowWidth},height=${windowHeight},left=${x},top=${y},resizable=yes`
-        );
-        
-        return this.window;
-    }
+    
 
     /**
      * Update particle position
@@ -82,20 +45,28 @@ class Particle {
         };
     }
 
-    /**
-     * Check if particle window is still open
-     */
-    isWindowOpen() {
-        return this.window && !this.window.closed;
-    }
+    
 
-    /**
-     * Close particle window
-     */
-    closeWindow() {
-        if (this.window && !this.window.closed) {
-            this.window.close();
-        }
+    draw(ctx) {
+        // Main circle
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.strokeStyle = "#222";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+
+        // Symbol
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 20px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.symbol, this.x, this.y);
+        ctx.restore();
     }
 }
 

@@ -7,19 +7,23 @@ class MagneticController {
     constructor() {
         this.particles = [];
         this.physicsEngine = new PhysicsEngine();
-        this.animationId = null;
-        this.windowOffset = 0;
+        this.canvas = document.getElementById('simCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.draggedParticle = null;
         this.isRunning = false;
-        
-        this.initialize();
+
+        this.setupUI();
+        this.setupCanvasEvents();
+        this.start();
     }
 
-    /**
-     * Initialize the controller
-     */
-    initialize() {
-        this.setupMessageListener();
-        this.startPhysicsLoop();
+    setupUI() {
+        document.getElementById('addPositive').onclick = () => this.createParticle('positive');
+        document.getElementById('addNegative').onclick = () => this.createParticle('negative');
+        document.getElementById('removeAll').onclick = () => {
+            this.particles = [];
+            this.updateUI();
+        };
         this.updateUI();
     }
 
@@ -27,195 +31,133 @@ class MagneticController {
      * Create a new particle
      */
     createParticle(type) {
-        const windowWidth = 300;
-        const windowHeight = 300;
-        
-        // Calculate position to avoid overlap
-        const x = 100 + (this.windowOffset % 3) * 350;
-        const y = 100 + Math.floor(this.windowOffset / 3) * 350;
-        
-        // Create particle using factory
-        const particle = ParticleFactory.createParticle(type, x + windowWidth/2, y + windowHeight/2);
-        
-        // Create window for particle
-        const particleWindow = particle.createWindow(x, y);
-        
-        if (particleWindow) {
-            this.particles.push(particle);
-            this.windowOffset++;
-            this.updateUI();
-            
-            // Monitor window closure
-            this.monitorWindowClosure(particle);
-            
-            console.log(`Created ${type} particle with ID: ${particle.id}`);
-        } else {
-            console.error('Failed to create particle window');
-        }
-    }
-
-    /**
-     * Monitor particle window closure
-     */
-    monitorWindowClosure(particle) {
-        const checkClosed = setInterval(() => {
-            if (!particle.isWindowOpen()) {
-                this.removeParticle(particle.id);
-                clearInterval(checkClosed);
-            }
-        }, 1000);
-    }
-
-    /**
-     * Remove a particle from the simulation
-     */
-    removeParticle(id) {
-        const index = this.particles.findIndex(p => p.id === id);
-        if (index !== -1) {
-            const particle = this.particles[index];
-            particle.closeWindow();
-            this.particles.splice(index, 1);
-            this.updateUI();
-            console.log(`Removed particle with ID: ${id}`);
-        }
-    }
-
-    /**
-     * Set up message listener for cross-window communication
-     */
-    setupMessageListener() {
-        window.addEventListener('message', (event) => {
-            const data = event.data;
-            
-            switch (data.type) {
-                case 'particle-update':
-                    this.handleParticleUpdate(data);
-                    break;
-                case 'particle-ready':
-                    this.handleParticleReady(data);
-                    break;
-                default:
-                    console.warn('Unknown message type:', data.type);
-            }
-        });
-    }
-
-    /**
-     * Handle particle position updates
-     */
-    handleParticleUpdate(data) {
-        const particle = this.particles.find(p => p.id === data.id);
-        if (particle) {
-            particle.updatePosition(data.x, data.y);
-        }
-    }
-
-    /**
-     * Handle particle ready notifications
-     */
-    handleParticleReady(data) {
-        console.log(`Particle ${data.id} is ready`);
-    }
-
-    /**
-     * Start the physics simulation loop
-     */
-    startPhysicsLoop() {
-        if (this.isRunning) return;
-        
-        this.isRunning = true;
-        const loop = () => {
-            if (this.particles.length > 0) {
-                this.physicsEngine.simulatePhysics(this.particles);
-                this.broadcastParticleData();
-            }
-            this.animationId = requestAnimationFrame(loop);
-        };
-        
-        loop();
-    }
-
-    /**
-     * Stop the physics simulation loop
-     */
-    stopPhysicsLoop() {
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
-            this.animationId = null;
-        }
-        this.isRunning = false;
-    }
-
-    /**
-     * Broadcast particle data to all windows
-     */
-    broadcastParticleData() {
-        const particleData = this.particles.map(p => p.toJSON());
-        
-        this.particles.forEach(particle => {
-            if (particle.isWindowOpen()) {
-                try {
-                    particle.window.postMessage({
-                        type: 'physics-update',
-                        allParticles: particleData,
-                        timestamp: Date.now()
-                    }, '*');
-                } catch (error) {
-                    console.warn('Failed to send message to particle window:', error);
-                    this.removeParticle(particle.id);
-                }
-            }
-        });
+        const id = Date.now() + Math.random();
+        // Place randomly within canvas, not too close to edge
+        const margin = 30;
+        const x = margin + Math.random() * (this.canvas.width - 2 * margin);
+        const y = margin + Math.random() * (this.canvas.height - 2 * margin);
+        const charge = type === 'positive' ? 1 : -1;
+        const particle = new Particle(id, type, charge, x, y);
+        this.particles.push(particle);
+        this.updateUI();
     }
 
     /**
      * Update UI elements
      */
     updateUI() {
-        const totalCount = this.particles.length;
-        const positiveCount = this.particles.filter(p => p.type === 'positive').length;
-        const negativeCount = this.particles.filter(p => p.type === 'negative').length;
-        
-        document.getElementById('particleCount').textContent = totalCount;
-        document.getElementById('positiveCount').textContent = positiveCount;
-        document.getElementById('negativeCount').textContent = negativeCount;
+        document.getElementById('particleCount').textContent = this.particles.length;
     }
 
     /**
-     * Get simulation statistics
+     * Set up canvas event listeners for particle interaction
      */
-    getStats() {
-        return {
-            particleCount: this.particles.length,
-            positiveCount: this.particles.filter(p => p.type === 'positive').length,
-            negativeCount: this.particles.filter(p => p.type === 'negative').length,
-            isRunning: this.isRunning
+    setupCanvasEvents() {
+        this.canvas.addEventListener('mousedown', (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            for (let p of this.particles) {
+                const dx = mouseX - p.x;
+                const dy = mouseY - p.y;
+                if (dx * dx + dy * dy < p.radius * p.radius) {
+                    this.draggedParticle = p;
+                    p.isDragging = true;
+                    p.dragOffset.x = dx;
+                    p.dragOffset.y = dy;
+                    break;
+                }
+            }
+        });
+
+        this.canvas.addEventListener('mousemove', (e) => {
+            if (this.draggedParticle) {
+                const rect = this.canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                this.draggedParticle.x = mouseX - this.draggedParticle.dragOffset.x;
+                this.draggedParticle.y = mouseY - this.draggedParticle.dragOffset.y;
+                this.draggedParticle.vx = 0;
+                this.draggedParticle.vy = 0;
+            }
+        });
+
+        this.canvas.addEventListener('mouseup', () => {
+            if (this.draggedParticle) {
+                this.draggedParticle.isDragging = false;
+                this.draggedParticle = null;
+            }
+        });
+
+        this.canvas.addEventListener('mouseleave', () => {
+            if (this.draggedParticle) {
+                this.draggedParticle.isDragging = false;
+                this.draggedParticle = null;
+            }
+        });
+    }
+
+    /**
+     * Start the physics simulation loop
+     */
+    start() {
+        if (this.isRunning) return;
+        this.isRunning = true;
+        const loop = () => {
+            this.physicsEngine.simulatePhysics(this.particles);
+            this.render();
+            requestAnimationFrame(loop);
         };
+        loop();
     }
 
     /**
-     * Reset simulation
+     * Render the simulation frame
      */
-    reset() {
-        this.particles.forEach(particle => particle.closeWindow());
-        this.particles = [];
-        this.windowOffset = 0;
-        this.updateUI();
-        console.log('Simulation reset');
+    render() {
+        // Clear
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Draw field lines
+        for (let i = 0; i < this.particles.length; i++) {
+            for (let j = i + 1; j < this.particles.length; j++) {
+                this.drawFieldLine(this.particles[i], this.particles[j]);
+            }
+        }
+
+        // Draw particles
+        for (let p of this.particles) {
+            p.draw(this.ctx);
+        }
     }
 
     /**
-     * Cleanup on page unload
+     * Draw a field line between two particles
      */
-    cleanup() {
-        this.stopPhysicsLoop();
-        this.reset();
+    drawFieldLine(p1, p2) {
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < 1) return;
+
+        // Color and opacity
+        const isAttraction = p1.charge * p2.charge < 0;
+        const color = isAttraction ? "#888" : "#bbb";
+        const opacity = Math.max(0.08, Math.min(0.25, 1000 / distance));
+
+        this.ctx.save();
+        this.ctx.strokeStyle = color;
+        this.ctx.globalAlpha = opacity;
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(p1.x, p1.y);
+        this.ctx.lineTo(p2.x, p2.y);
+        this.ctx.stroke();
+        this.ctx.restore();
     }
 }
 
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-    if (window.controller) {
-        window.controller.cleanup();
-    }
+// Initialize controller on page load
+window.addEventListener('DOMContentLoaded', () => {
+    window.controller = new MagneticController();
 });

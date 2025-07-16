@@ -2,53 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magnetic Field Controller</title>
+    <title>Magnetic Field Simulation</title>
     <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
-    <div class="container">
-        <h1>⚡ Magnetic Field Simulation</h1>
-        
-        <div class="controls">
-            <div class="particle-control positive">
-                <h3>🔴 Positive Charge</h3>
-                <button onclick="controller.createParticle('positive')">Create Positive Particle</button>
-            </div>
-            
-            <div class="particle-control negative">
-                <h3>🔵 Negative Charge</h3>
-                <button onclick="controller.createParticle('negative')">Create Negative Particle</button>
-            </div>
-        </div>
-        
-        <div class="status">
-            <div>Active Particles: <span id="particleCount">0</span></div>
-            <div class="window-info">
-                <span>Positive: <span id="positiveCount">0</span></span>
-                <span>Negative: <span id="negativeCount">0</span></span>
-            </div>
-        </div>
-        
-        <div class="instructions">
-            <h3>📋 Instructions</h3>
-            <ul>
-                <li>Click "Create Positive Particle" or "Create Negative Particle" to spawn magnetic objects</li>
-                <li>Each particle opens in a new window</li>
-                <li>Particles with opposite charges attract each other</li>
-                <li>Particles with same charges repel each other</li>
-                <li>Drag particles around to see real-time magnetic interactions</li>
-                <li>Watch the force field lines connecting the particles</li>
-            </ul>
-        </div>
+    <h1>Magnetic Field Simulation</h1>
+    <button id="addPositive">Add Positive Particle</button>
+    <button id="addNegative">Add Negative Particle</button>
+    <button id="removeAll">Remove All Particles</button>
+    <span>Particles: <span id="particleCount">0</span></span>
+    <div>
+        <canvas id="simCanvas" width="700" height="500" style="border:1px solid #aaa;"></canvas>
     </div>
-
+    <script src="js/config.js"></script>
     <script src="js/physics.js"></script>
     <script src="js/particle.js"></script>
     <script src="js/controller.js"></script>
-    <script>
-        // Initialize the application
-        const controller = new MagneticController();
-    </script>
 </body>
 </html>
